@@ -136,5 +136,7 @@
   .hero3--c .hero3__grid { height: auto; gap: 28px; }
 }
 
-/* Aviad 2026-11-05: the second sentence of the offer heading in another shade */
-.h2__shade { color: var(--muted); }
+/* Aviad 2026-11-05: the second sentence of the offer heading in another shade. Noam wanted more
+   contrast than --muted. The brand book has no accent, so this is a light tint of the brand navy's
+   own hue: 8.9:1 on the page background. */
+.h2__shade { color: #6ec1ff; }
