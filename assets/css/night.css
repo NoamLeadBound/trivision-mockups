@@ -135,3 +135,6 @@
   .hero3 .dev__rig { transform: none; }
   .hero3--c .hero3__grid { height: auto; gap: 28px; }
 }
+
+/* Aviad 2026-11-05: the second sentence of the offer heading in another shade */
+.h2__shade { color: var(--muted); }
