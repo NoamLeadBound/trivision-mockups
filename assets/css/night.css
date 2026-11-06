@@ -47,7 +47,7 @@
 .ftr__tel { display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 16px; border: 1px solid var(--rule-strong); border-radius: var(--radius); color: var(--ink); text-decoration: none; transition: background-color .2s, color .2s; }
 .ftr__tel:hover { background: var(--ink); color: var(--paper); }
 .ftr__tel span { font-size: 14px; }
-.ftr__tel b { font-size: 15px; font-weight: 400; letter-spacing: .02em; }
+.ftr__tel b { font-size: 15px; font-weight: 400; letter-spacing: .02em; white-space: nowrap; }
 
 /* ---------- header: solid enough that nothing reads through it ---------- */
 .hdr { background: rgb(14 27 41 / .97); }
@@ -140,3 +140,11 @@
    (Aviad and Noam 2026-11-05). The brand book has no accent, so this is a light tint of the brand
    navy's own hue: 8.9:1 on the page background. Keep it rare, or nothing stands out. */
 .shade { color: #6ec1ff; }
+
+/* ---------- ICP pages: proof line above the quote (empty on the root, then not rendered) ---------- */
+.proofline { max-width: 62ch; margin-bottom: clamp(28px, 4vw, 48px); }
+.proofline h3 { font: 700 clamp(22px, 2.2vw, 30px)/1.3 var(--he); letter-spacing: -0.01em; text-wrap: balance; }
+.proofline p { margin-top: 10px; font-size: 17px; line-height: 1.55; opacity: .86; text-wrap: pretty; }
+
+/* ---------- form: opens WhatsApp with the message ready, no server ---------- */
+.form__ok a { color: inherit; text-decoration: underline; text-underline-offset: 3px; font-weight: 700; }

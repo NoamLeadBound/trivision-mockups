@@ -32,3 +32,30 @@
   addEventListener('resize', onScroll);
   frame();
 })();
+
+// Form without a server: builds a WhatsApp Business message (name, company, employees, source page) and opens
+// wa.me. Nothing is sent from here; the visitor presses send in WhatsApp.
+(() => {
+  const NL = '\n';
+  const build = (f) => {
+    const v = (n) => ((f.elements[n] && f.elements[n].value) || '').trim();
+    const lines = ['שלום, אשמח לתאם הדגמה של TriVision.', 'שם: ' + v('name')];
+    if (v('role')) lines.push('תפקיד: ' + v('role'));
+    lines.push('חברה: ' + v('company'), 'מספר עובדים: ' + v('size'), 'דף מקור: ' + (f.dataset.source || ''));
+    return 'https://wa.me/' + f.dataset.wa + '?text=' + encodeURIComponent(lines.join(NL));
+  };
+  document.querySelectorAll('form[data-wa]').forEach((f) => {
+    const go = f.querySelector('.form__go');
+    const sync = () => { if (go) go.href = build(f); };
+    f.addEventListener('input', sync);
+    f.addEventListener('change', sync);
+    f.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const href = build(f);
+      if (go) go.href = href;
+      f.classList.add('is-sent');
+      window.open(href, '_blank', 'noopener');
+    });
+    sync();
+  });
+})();
