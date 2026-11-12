@@ -33,7 +33,7 @@
   frame();
 })();
 
-// Form without a server: builds a WhatsApp Business message (name, company, employees, source page) and opens
+// Form without a server: builds a WhatsApp Business message (name, role, company, employees) and opens
 // wa.me. Nothing is sent from here; the visitor presses send in WhatsApp.
 (() => {
   const NL = '\n';
@@ -41,7 +41,7 @@
     const v = (n) => ((f.elements[n] && f.elements[n].value) || '').trim();
     const lines = ['שלום, אשמח לתאם הדגמה של TriVision.', 'שם: ' + v('name')];
     if (v('role')) lines.push('תפקיד: ' + v('role'));
-    lines.push('חברה: ' + v('company'), 'מספר עובדים: ' + v('size'), 'דף מקור: ' + (f.dataset.source || ''));
+    lines.push('חברה: ' + v('company'), 'מספר עובדים: ' + v('size'));  // no source-page line (Noam 2026-11-12): tracking knows the page
     return 'https://wa.me/' + f.dataset.wa + '?text=' + encodeURIComponent(lines.join(NL));
   };
   document.querySelectorAll('form[data-wa]').forEach((f) => {
