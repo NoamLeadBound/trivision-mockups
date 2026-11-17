@@ -2,8 +2,12 @@
  * track.js, without Calendly: TriVision's action is the WhatsApp form.
  * Configure on <html>: data-page="<root|hitech|welfare|pro|eng>", data-endpoint="<n8n webhook>".
  * The link carries ?t=<opaque token> (never a name or an email).
- * A visit counts only after a human signal (scroll, pointer, touch, key), because mail scanners and
- * link-preview bots open links and never interact. Nothing is sent before that.
+ * The page does NOT decide who is human (17.11, the Corz lesson: Microsoft / Oracle / AWS link scanners open
+ * every link in a real browser, scroll to the bottom and click buttons). Every event carries the facts and n8n
+ * decides with the visitor's IP owner (skill client-landing-pages, references/tracking-alerts.md §2b):
+ *   tz/lang  browser time zone + language      wd  navigator.webdriver      inp  first REAL input
+ *   (trusted pointer move / wheel / touch / key; scroll alone is not input)    jump  scripted scroll-to-bottom
+ * Active seconds count only after real input.
  * Every event carries the visit's running totals (active seconds, deepest scroll %), so the last event
  * of a visit is its summary. Events:
  *   visit · scroll_30/60/90 · time_20/60/180 (active seconds) · video_play/50/90 · form_seen ·
@@ -22,14 +26,20 @@
   var lastMove = 0;
   var maxScroll = 0;         // deepest point reached, % of the page
   var lastLeave = 0;
+  var ctx = { tz: '', lang: navigator.language || '', wd: !!navigator.webdriver, inp: '', jump: false };
+  try { ctx.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* old browser */ }
+  var firstScroll = 0;
 
   function post(name, extra) {
-    var body = { event: name, t: token, page: PAGE, sid: sid, active_s: active, scroll: maxScroll, extra: extra || null };
+    var x = {};
+    for (var k in ctx) x[k] = ctx[k];
+    for (var j in (extra || {})) x[j] = extra[j];
+    var body = { event: name, t: token, page: PAGE, sid: sid, active_s: active, scroll: maxScroll, extra: x };
     if (!ENDPOINT) { console.info('[lp-track]', body); return; }
     try { navigator.sendBeacon(ENDPOINT, new URLSearchParams({ d: JSON.stringify(body) })); } catch (e) { /* never break the page */ }
   }
   function once(name, extra) {
-    if (!human || sent[name]) return;
+    if (sent[name]) return;
     sent[name] = true;
     post(name, extra);
   }
@@ -38,17 +48,23 @@
     var h = document.documentElement;
     return Math.min(100, Math.round((h.scrollTop + innerHeight) / h.scrollHeight * 100));
   }
-  function moved() {
+  // Every load says so at once; whether it was a person is decided in n8n.
+  once('visit');
+  function moved(e) {
+    if (e && e.isTrusted === false) return;
+    if (e && e.type === 'pointermove' && !(e.movementX || e.movementY)) return;
     lastMove = Date.now();
-    if (!human) { human = true; maxScroll = scrollPct(); once('visit'); }
+    if (!human) { human = true; ctx.inp = e ? e.type : 'click'; maxScroll = scrollPct(); once('engaged'); }
   }
-  ['scroll', 'pointerdown', 'pointermove', 'touchstart', 'keydown'].forEach(function (ev) {
+  ['pointerdown', 'pointermove', 'wheel', 'touchstart', 'keydown'].forEach(function (ev) {
     addEventListener(ev, moved, { passive: true });
   });
 
   addEventListener('scroll', function () {
     var p = scrollPct();
+    if (!firstScroll) firstScroll = Date.now();
     if (p > maxScroll) maxScroll = p;
+    if (p >= 90 && !human && Date.now() - firstScroll < 800) ctx.jump = true;
     if (maxScroll >= 30) once('scroll_30');
     if (maxScroll >= 60) once('scroll_60');
     if (maxScroll >= 90) once('scroll_90');
@@ -90,12 +106,12 @@
       var v = function (n) { return ((f.elements[n] && f.elements[n].value) || '').trim().slice(0, 80); };
       return { name: v('name'), role: v('role'), company: v('company'), size: v('size') };
     }
-    f.addEventListener('submit', function () { moved(); once('wa_click', typed()); });
+    f.addEventListener('submit', function (e) { moved(e); once('wa_click', typed()); });
     var go = f.querySelector('.form__go');
-    if (go) go.addEventListener('click', function () { moved(); once('wa_click', typed()); });
+    if (go) go.addEventListener('click', function (e) { moved(e); once('wa_click', typed()); });
   });
 
   document.querySelectorAll('a[href^="tel:"]').forEach(function (a) {
-    a.addEventListener('click', function () { moved(); once('tel_click'); });
+    a.addEventListener('click', function (e) { moved(e); once('tel_click'); });
   });
 })();
