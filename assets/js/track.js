@@ -30,13 +30,38 @@
   try { ctx.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; } catch (e) { /* old browser */ }
   var firstScroll = 0;
 
+  // Send gate (26.11.2026): an n8n execution is spent only on a page load that could be a person.
+  // Mail-link scanners (Microsoft Defender / Safe Links above all) fake a mouse move and even scroll, so input
+  // proves nothing, but they run in the time zone America/Los_Angeles and the browser knows its own zone.
+  // Measured 12-26.11 on Trivision + Corz: this gate holds back 185 of 194 scanner loads and 0 of 31 people.
+  // A load outside the zone still goes through once it reaches the alert's own bar (20 active seconds, 30%
+  // scroll), and then everything it held back is sent with the visit's current totals. A load without a token
+  // sends only wa_click, tel_click (n8n drops the rest anyway). n8n still classifies whatever arrives:
+  // the gate saves executions, it is not the verdict. data-human-tz="off" turns it off (a campaign abroad).
+  var gateTz = ctx.tz;
+  var ALWAYS = { wa_click: 1, tel_click: 1 };
+  var ZONES = H.getAttribute('data-human-tz') || 'Asia/Jerusalem,Asia/Tel_Aviv';
+  var open = ZONES === 'off' || ZONES.split(',').indexOf(gateTz) >= 0;
+  var held = [];
+  var lastLeaveState = '';
+  function beacon(body) {
+    try { navigator.sendBeacon(ENDPOINT, new URLSearchParams({ d: JSON.stringify(body) })); } catch (e) { /* never break the page */ }
+  }
+  function gate() {
+    if (open || active < 20 || maxScroll < 30) return;
+    open = true;
+    held.splice(0).forEach(function (b) { b.active_s = active; b.scroll = maxScroll; beacon(b); });
+  }
+
   function post(name, extra) {
     var x = {};
     for (var k in ctx) x[k] = ctx[k];
     for (var j in (extra || {})) x[j] = extra[j];
     var body = { event: name, t: token, page: PAGE, sid: sid, active_s: active, scroll: maxScroll, extra: x };
     if (!ENDPOINT) { console.info('[lp-track]', body); return; }
-    try { navigator.sendBeacon(ENDPOINT, new URLSearchParams({ d: JSON.stringify(body) })); } catch (e) { /* never break the page */ }
+    if (!token && !ALWAYS[name]) return;
+    if (!open && !ALWAYS[name]) { if (name !== 'leave') held.push(body); return; }
+    beacon(body);
   }
   function once(name, extra) {
     if (sent[name]) return;
@@ -68,6 +93,7 @@
     if (maxScroll >= 30) once('scroll_30');
     if (maxScroll >= 60) once('scroll_60');
     if (maxScroll >= 90) once('scroll_90');
+    gate();
   }, { passive: true });
 
   setInterval(function () {
@@ -76,10 +102,13 @@
     if (active === 20) once('time_20');
     if (active === 60) once('time_60');
     if (active === 180) once('time_180');
+    gate();
   }, 1000);
 
   addEventListener('visibilitychange', function () {
     if (document.visibilityState !== 'hidden' || !human || Date.now() - lastLeave < 30000) return;
+    if (lastLeaveState === active + ':' + maxScroll) return;   // nothing new since the last leave
+    lastLeaveState = active + ':' + maxScroll;
     lastLeave = Date.now();
     post('leave');
   });
